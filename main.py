@@ -75,7 +75,7 @@ def creat_bspline(rows,cols,grid_spacing):
     grid_rows, grid_cols = row_block_num + BPLINE_BOARD_SIZE, col_block_num + BPLINE_BOARD_SIZE
     # 初始化网格点权重
     # grid_points=5*np.random.rand(2,grid_rows,grid_cols)
-    grid_point = np.random.randint(-14, 14, (2,grid_rows, grid_cols))
+    grid_point = 10*np.random.random((2,grid_rows, grid_cols))
 
     deltx = rows * 1.0 / row_block_num
     delty = cols * 1.0 / col_block_num
@@ -134,152 +134,59 @@ def bspline_trans(img,indx,indy,grid_point,pX,pY,x_block_floor,y_block_floor):
     return dstimg,Tx,Ty
 
 
-def cat_rect_cal(img,location,grid_point,Tx,Ty,coeff_xy):
-    """
-    将tx,ty明确成二维矩阵，
-    根据control_point反推其属于哪个m,n，即可计算这些点对应的tx,ty增量是多少
-    Parameters
-    ----------
-    img
-    location
-    grid_point
-    Tx
-    Ty
-    coeff_xy
 
-    Returns
-    -------
-
-    """
-    row,col=img.shape
-
-    #明确受影响的点
-    control_point_xx,control_point_yy=location
-    x1=np.floor((control_point_xx-3)*deltx)
-    y1=np.floor((control_point_yy-3)*delty)
-    x2=(control_point_xx+1)*deltx
-    y2=(control_point_yy+1)*delty
-    result1=(np.clip([x1,x2],0,row)).astype(np.int)
-    result2=(np.clip([y1,y2],0,col)).astype(np.int)
-
-    dstimg = img.copy()
-
-    grid_loc = []
-    grid_loc.append(np.arange(result1[0], result1[1], 1))
-    grid_loc.append(np.arange(result2[0], result2[1], 1))
-    meshgrid = np.meshgrid(grid_loc[0], grid_loc[1])
-    indx=(np.squeeze((meshgrid[0]).T).reshape(-1)).astype(np.int)
-    indy=(np.squeeze((meshgrid[1]).T).reshape(-1)).astype(np.int)
-
-    for m in range(0, 4):
-        control_point_x = (x_block_floor + m).astype(np.int)
-        for n in range(0, 4):
-            control_point_y = (y_block_floor + n).astype(np.int)
-            grid_pointx_loc = grid_point[0,control_point_x, control_point_y]
-            grid_pointy_loc = grid_point[1,control_point_x, control_point_y]
-            Tx += coeff_xy[:, m, n] * grid_pointx_loc
-            Ty += coeff_xy[:, m, n] * grid_pointy_loc
-
-
-
-def return_bsp_det(img,grid_spacing=8):
-    rows, cols = img.shape
-    x_ord, y_ord = np.where(img != np.inf)
-    indx, indy = x_ord, y_ord
-    grid_point, deltx, delty=creat_bspline(rows,cols,grid_spacing)
-    #计算每个点相对于网格的位置，之后对每个点的对应的B样条函数做初始化处理
-    [pX,pY,x_block_floor,y_block_floor]=pre_cal_bspline(indx,indy,deltx,delty)
-
-
-    coeff_xy = (pX @ np.transpose(pY, [0, 2, 1]))  # .reshape(len(indx),-1)
-    coxy=coeff_xy.reshape(rows,cols,4,4)
-
-
-
-    #根据初始化得到的gridpoint计算对应的每个点的偏移量
-    Tx1, Ty1 = np.zeros(len(indx)), np.zeros(len(indy))
-    for m in range(0, 4):
-        control_point_x = (x_block_floor + m).astype(np.int)
-        for n in range(0, 4):
-            control_point_y = (y_block_floor + n).astype(np.int)
-            grid_pointx_loc = grid_point[0,control_point_x, control_point_y]
-            grid_pointy_loc = grid_point[1,control_point_x, control_point_y]
-            Tx1 += coeff_xy[:, m, n] * grid_pointx_loc
-            Ty1 += coeff_xy[:, m, n] * grid_pointy_loc
-
-    Tx1=Tx1.reshape(1,rows,cols)
-    Ty1=Ty1.reshape(1,rows,cols)
-    return np.stack([Tx1,Ty1],axis=1)
 if __name__ == "__main__":
 
-
-
-    """
-    本段将图像的二维B样条形变编写成函数形式，保证了速度
     img = Draw_board(5, 5, 100)[:,:,2]
-
-    #计算输入图像的行列数，存储其位置索引
-    rows, cols = img.shape
+    rs, cs = img.shape
     x_ord, y_ord = np.where(img != np.inf)
-    indx, indy = x_ord, y_ord
+    idx,idy = x_ord, y_ord
 
-    #初始化B样条网格间距并随机初始化网格
-    grid_spacing=20
-    grid_point, deltx, delty=creat_bspline(rows,cols,grid_spacing)
-    #计算每个点相对于网格的位置，之后对每个点的对应的B样条函数做初始化处理
-    [pX,pY,x_block_floor,y_block_floor]=pre_cal_bspline(indx,indy,deltx,delty)
-    #得到形变图像
-    ans = bspline_trans(img, indx, indy, grid_point, pX,pY,x_block_floor,y_block_floor)
-    plt.imshow(ans)
-    plt.show()
-    """
-    #初始化棋盘网格
-    img = Draw_board(5, 5, 100)[:,:,2]
-
-
-    #计算输入图像的行列数，存储其位置索引
-    rows, cols = img.shape
-    x_ord, y_ord = np.where(img != np.inf)
-    indx, indy = x_ord, y_ord
-    #indxy = np.concatenate((np.expand_dims(indx, axis=1), np.expand_dims(indy, axis=1)), axis=1)
-    #初始化B样条网格间距并随机初始化网格
-    grid_spacing=8
-    grid_point, deltx, delty=creat_bspline(rows,cols,grid_spacing)
-    #计算每个点相对于网格的位置，之后对每个点的对应的B样条函数做初始化处理
-    [pX,pY,x_block_floor,y_block_floor]=pre_cal_bspline(indx,indy,deltx,delty)
+    gd_spacing=8
+    gdpt, dx, dy = creat_bspline(rs, cs, gd_spacing)
+    [px,py,xblock_floor,yblock_floor]=pre_cal_bspline(idx,idy,dx,dy)
 
 
 
-    coeff_xy = (pX @ np.transpose(pY, [0, 2, 1]))  # .reshape(len(indx),-1)
-    coxy=coeff_xy.reshape(rows,cols,4,4)
 
+    coeffxy = (px @ np.transpose(py, [0, 2, 1]))  # .reshape(len(indx),-1)
+    coxy=coeffxy.reshape(rs,cs,4,4)
 
 
     #根据初始化得到的gridpoint计算对应的每个点的偏移量
-    Tx1, Ty1 = np.zeros(len(indx)), np.zeros(len(indy))
+    Tx1, Ty1 = np.zeros(len(idx)), np.zeros(len(idy))
     for m in range(0, 4):
-        control_point_x = (x_block_floor + m).astype(np.int)
+        control_point_x = (xblock_floor + m).astype(np.int)
         for n in range(0, 4):
-            control_point_y = (y_block_floor + n).astype(np.int)
-            grid_pointx_loc = grid_point[0,control_point_x, control_point_y]
-            grid_pointy_loc = grid_point[1,control_point_x, control_point_y]
-            Tx1 += coeff_xy[:, m, n] * grid_pointx_loc
-            Ty1 += coeff_xy[:, m, n] * grid_pointy_loc
+            control_point_y = (yblock_floor + n).astype(np.int)
+            grid_pointx_loc = gdpt[0,control_point_x, control_point_y]
+            grid_pointy_loc = gdpt[1,control_point_x, control_point_y]
+            Tx1 += coeffxy[:, m, n] * grid_pointx_loc
+            Ty1 += coeffxy[:, m, n] * grid_pointy_loc
 
+    #Local update some grid's weights，Still need to calculate 4*4=16 points
+    gdpt[:,27,17]+=[0.342,0.288]
+    Tx2, Ty2 = np.zeros(len(idx)), np.zeros(len(idy))
+    for m in range(0, 4):
+        control_point_x = (xblock_floor + m).astype(np.int)
+        for n in range(0, 4):
+            control_point_y = (yblock_floor + n).astype(np.int)
+            grid_pointx_loc = gdpt[0,control_point_x, control_point_y]
+            grid_pointy_loc = gdpt[1,control_point_x, control_point_y]
+            Tx2 += coeffxy[:, m, n] * grid_pointx_loc
+            Ty2 += coeffxy[:, m, n] * grid_pointy_loc
 
-
-
-
-    #改变某个点的权重，计算Tx,Ty的改变
+    #Local update some grid's weights，Only need to calculate 1 points
     location=[27,17]
+    bias=[0.342,0.288]
     #只计算部分区域的点值
     control_point_xx,control_point_yy=location
-    x1=np.floor((control_point_xx-3)*deltx)
-    y1=np.floor((control_point_yy-3)*delty)
-    x2=np.floor((control_point_xx+1)*deltx)
-    y2=np.floor((control_point_yy+1)*delty)
-    result1=(np.clip([x1,x2],0,rows)).astype(np.int)
-    result2=(np.clip([y1,y2],0,cols)).astype(np.int)
+    x1=np.floor((control_point_xx-3)*dx)
+    y1=np.floor((control_point_yy-3)*dy)
+    x2=np.floor((control_point_xx+1)*dx)
+    y2=np.floor((control_point_yy+1)*dy)
+    result1=(np.clip([x1,x2],0,rs)).astype(np.int)
+    result2=(np.clip([y1,y2],0,cs)).astype(np.int)
     grid_loc = []
     grid_loc.append(np.arange(result1[0]+1, result1[1], 1))#此处起始点+1是为了保持与实际计算误差区域一致
     grid_loc.append(np.arange(result2[0]+1, result2[1], 1))
@@ -287,57 +194,29 @@ if __name__ == "__main__":
     indxx=(np.squeeze((meshgrid[0]).T).reshape(-1)).astype(np.int)
     indyy=(np.squeeze((meshgrid[1]).T).reshape(-1)).astype(np.int)#得到这些点的索引列表
 
-
-    grid_point[:,27,17]+=[7,8]
-    Tx2, Ty2 = np.zeros(len(indx)), np.zeros(len(indy))
-    for m in range(0, 4):
-        control_point_x = (x_block_floor + m).astype(np.int)
-        for n in range(0, 4):
-            control_point_y = (y_block_floor + n).astype(np.int)
-            grid_pointx_loc = grid_point[0,control_point_x, control_point_y]
-            grid_pointy_loc = grid_point[1,control_point_x, control_point_y]
-            Tx2 += coeff_xy[:, m, n] * grid_pointx_loc
-            Ty2 += coeff_xy[:, m, n] * grid_pointy_loc
+    x_block = (indxx * 1.0 / dx).astype(np.float)
+    y_block = (indyy * 1.0 / dy).astype(np.float)
+    x_blockfloor = (np.floor(x_block)).astype(np.int)
+    y_blockfloor=  (np.floor(y_block)).astype(np.int)
+    m=(location[0]-x_blockfloor).astype(np.int)
+    n=(location[1]-y_blockfloor).astype(np.int)
 
 
-    #cc=(Tx1-Tx2).reshape(rows,cols)[indxx,indyy],cc.sum==sum(Tx1-Tx2),验证了偏移量的变化限制在此范围
-    #获取tx1,tx2之间差异的地方在哪里
-    tx_diff=np.where((Tx1-Tx2).reshape(rows,cols)!=0)
-    ty_diff=np.where((Ty1-Ty2).reshape(rows,cols)!=0)
+    Tx3=(Tx1.copy()).reshape(rs,cs)
+    Ty3=(Ty1.copy()).reshape(rs,cs)
 
+    """感觉问题出在这里，把上面提到的直接赋值，改成了copy"""
+    Tx3[indxx,indyy]+=coxy[indxx,indyy, m, n] *0.342#1是偏移量
+    Ty3[indxx,indyy]+=coxy[indxx,indyy, m, n] * 0.288
 
-
-
-
-    x_block = (indxx * 1.0 / deltx).astype(np.float)
-    y_block = (indyy * 1.0 / delty).astype(np.float)
-    x_block_floor = (np.floor(x_block)).astype(np.int)
-    y_block_floor=  (np.floor(y_block)).astype(np.int)
-    m=(location[0]-x_block_floor).astype(np.int)
-    n=(location[1]-y_block_floor).astype(np.int)
-
-
-    tx=(Tx1.copy()).reshape(rows,cols)
-    ty=(Ty1.copy()).reshape(rows,cols)
-
-    """感觉问题出在这里"""
-    tx[indxx,indyy]+=coxy[indxx,indyy, m, n] * 7#1是偏移量
-    ty[indxx,indyy]+=coxy[indxx,indyy, m, n] * 8
-
+    """tx1 is the original offset, tx2 is the new offset computed based on the B-spline localization property after updating one point randomly, 
+    and tx3 is the new offset computed after optimizing b by computing only one control point, tx2=tx3"""
     errx1=np.sum(Tx1-Tx2)
     erry1=np.sum(Ty1-Ty2)
-    errx2=np.sum(Tx1-tx.reshape(-1))
-    erry2=np.sum(Ty1-ty.reshape(-1))
-    errx3=np.sum(abs(Tx2-tx.reshape(-1)))
-    erry3=np.sum(abs(Ty2-ty.reshape(-1)))
-
-    Tx3=tx.reshape(-1)
-    Ty3=ty.reshape(-1)
-
-
-    #单步到T2那部分，然后计算Tx1-Tx2的值与到第三部分后Tx1=tx2不一样，但是与coxy[....].sum()一样。
-
-
+    errx2=np.sum(Tx1-Tx3.reshape(-1))
+    erry2=np.sum(Ty1-Ty3.reshape(-1))
+    errx3=np.sum(abs(Tx2-Tx3.reshape(-1)))
+    erry3=np.sum(abs(Ty2-Ty3.reshape(-1)))
 
 
     abroke=1
